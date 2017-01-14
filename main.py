@@ -1,15 +1,17 @@
 from constants import teams, var_view_map
 from nba_py.team import TeamGameLogs
-from helper_funcs import _color, _alpha
+from helper_funcs import _color, _alpha, get_latest
 
-from bokeh.plotting import figure, show
-from bokeh.layouts import layout, widgetbox, column
+from bokeh.plotting import figure
+from bokeh.layouts import layout, widgetbox
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.models.widgets import Slider, Select, Button, DataTable, TableColumn
 from bokeh.io import curdoc
+from sqlalchemy import create_engine
+
+engine = create_engine('sqlite:///nba_viz.db')
 
 team_options = list(teams.keys())
-
 begin = Slider(title="First game", start=1,
                end=82, value=1, step=1)
 end = Slider(title="Last game (defaults to latest)", start=1,
@@ -23,11 +25,12 @@ view_data = Button(label='View Data!', button_type='success')
 
 source = ColumnDataSource(data=dict(x=[], y=[], win=[],
                                     opp=[], away=[], color=[], alpha=[]))
-source_average = ColumnDataSource(data=dict(games=[], mean=[], std=[],
+source_average = ColumnDataSource(data=dict(team=[], games=[], mean=[], std=[],
                                             _25percentile=[], median=[],
                                             _75percentile=[], max=[]))
 
 columns = [
+    TableColumn(field='team', title='Team'),
     TableColumn(field='games', title='GP'),
     TableColumn(field="mean", title="Mean"),
     TableColumn(field="std", title="Std"),
@@ -79,15 +82,17 @@ def update():
     p.yaxis.axis_label = y_axis.value
 
     averages = df[y_lab].describe()
+    league_average = get_latest(engine, 'AST')
     source_average.data = dict(
-        games=[round(averages['count'], 2)],
-        mean=[round(averages['mean'], 2)],
-        std=[round(averages['std'], 2)],
-        min=[round(averages['min'], 2)],
-        _25percentile=[round(averages['25%'], 2)],
-        median=[round(averages['50%'], 2)],
-        _75percentile=[round(averages['75%'], 2)],
-        max=[round(averages['max'], 2)],
+        team=[team_selection.value, 'league average'],
+        games=[round(averages['count'], 2), league_average['gp']],
+        mean=[round(averages['mean'], 2), league_average['mean']],
+        std=[round(averages['std'], 2), league_average['std']],
+        min=[round(averages['min'], 2), league_average['min']],
+        _25percentile=[round(averages['25%'], 2), league_average['u25th']],
+        median=[round(averages['50%'], 2), league_average['median']],
+        _75percentile=[round(averages['75%'], 2), league_average['u75th']],
+        max=[round(averages['max'], 2), league_average['umax']],
     )
 
     source.data = dict(
