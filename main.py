@@ -13,8 +13,8 @@ from sqlalchemy import create_engine
 engine = create_engine('sqlite:///nba_viz.db')
 
 team_options = list(teams.keys())
-begin = Slider(title="First game", start=0,
-               end=82, value=0, step=1)
+begin = Slider(title="First game", start=1,
+               end=82, value=1, step=1)
 end = Slider(title="Last game (defaults to latest)", start=1,
              end=82, value=82, step=1)
 team_selection = Select(title='Team', value='GSW', options=team_options)
@@ -24,7 +24,7 @@ y_axis = Select(title='Statistic to plot',
 
 view_data = Button(label='View Data!', button_type='success')
 
-source = ColumnDataSource(data=dict(x=[], y=[], yl=[], win=[],
+source = ColumnDataSource(data=dict(x=[], y=[], yl=[], win=[], game=[],
                                     opp=[], away=[], color=[], alpha=[]))
 source_average = ColumnDataSource(data=dict(team=[], games=[], mean=[], std=[],
                                             _25percentile=[], median=[],
@@ -42,7 +42,7 @@ columns = [
 ]
 
 hover = HoverTool(tooltips=[
-    ('Game', '$index'),
+    ('Game', '@game'),
     ('Win', '@win'),
     ('Opponent', '@opp'),
     ('Away', '@away')])
@@ -70,10 +70,11 @@ def select_data():
     data = data[data.WL.notnull()]
     data['Away'] = data.apply(lambda x: '@' in x['MATCHUP'], axis=1)
     data['Opp'] = data.apply(lambda x: x['MATCHUP'][-3:], axis=1)
+    data['game'] = data.index.values
 
     stat = var_view_map[y_axis.value]
 
-    selection = data[['Opp', 'GAME_DATE', 'WL', 'Away', stat]]
+    selection = data[['game', 'Opp', 'GAME_DATE', 'WL', 'Away', stat]]
     selection['color'] = selection.apply(_color, axis=1)
     selection['alpha'] = selection.apply(_alpha, axis=1)
     return selection
@@ -113,7 +114,8 @@ def update():
         alpha=df['alpha'],
         win=df['WL'],
         opp=df['Opp'],
-        away=df['Away']
+        away=df['Away'],
+        game=df['game']
     )
 
 
