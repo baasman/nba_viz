@@ -1,6 +1,7 @@
 from constants import teams, var_view_map
 from nba_py.team import TeamGameLogs
 from helper_funcs import _color, _alpha, get_latest
+import pandas as pd
 
 from bokeh.plotting import figure
 from bokeh.layouts import layout, widgetbox
@@ -12,8 +13,8 @@ from sqlalchemy import create_engine
 engine = create_engine('sqlite:///nba_viz.db')
 
 team_options = list(teams.keys())
-begin = Slider(title="First game", start=1,
-               end=82, value=1, step=1)
+begin = Slider(title="First game", start=0,
+               end=82, value=0, step=1)
 end = Slider(title="Last game (defaults to latest)", start=1,
              end=82, value=82, step=1)
 team_selection = Select(title='Team', value='GSW', options=team_options)
@@ -23,7 +24,7 @@ y_axis = Select(title='Statistic to plot',
 
 view_data = Button(label='View Data!', button_type='success')
 
-source = ColumnDataSource(data=dict(x=[], y=[], win=[],
+source = ColumnDataSource(data=dict(x=[], y=[], yl=[], win=[],
                                     opp=[], away=[], color=[], alpha=[]))
 source_average = ColumnDataSource(data=dict(team=[], games=[], mean=[], std=[],
                                             _25percentile=[], median=[],
@@ -50,6 +51,8 @@ p = figure(plot_height=600, plot_width=700, title='',
            toolbar_location=None, tools=[hover])
 p.circle(x='x', y='y', source=source, size=7, color='color',
          line_color=None, fill_alpha='alpha')
+p.line(x='x', y='yl', source=source, line_color='red', line_width=2,
+       legend='league average')
 data_table = DataTable(source=source_average, columns=columns,
                        width=1000, height=300)
 
@@ -57,6 +60,9 @@ data_table = DataTable(source=source_average, columns=columns,
 def select_data():
     team = team_selection.value
     data = TeamGameLogs(teams[team]).info()
+    data.GAME_DATE = pd.to_datetime(data.GAME_DATE)
+    data.sort_values(by='GAME_DATE', ascending=True, inplace=True)
+    data.set_index(data.index[::-1] + 1, drop=True, inplace=True)
 
     first_game = begin.value
     last_game = min(end.value, data.shape[0])
@@ -82,9 +88,13 @@ def update():
     p.yaxis.axis_label = y_axis.value
 
     averages = df[y_lab].describe()
-    league_average = get_latest(engine, 'AST')
+    league_average = get_latest(engine, y_lab)
+    avg_for_line = league_average['mean']
+    yl = [avg_for_line] * df.shape[0]
+    df['yl'] = yl
+
     source_average.data = dict(
-        team=[team_selection.value, 'league average'],
+        team=[team_selection.value, 'league avg'],
         games=[round(averages['count'], 2), league_average['gp']],
         mean=[round(averages['mean'], 2), league_average['mean']],
         std=[round(averages['std'], 2), league_average['std']],
@@ -98,6 +108,7 @@ def update():
     source.data = dict(
         x=df.index.values,
         y=df[y_lab],
+        yl=df['yl'],
         color=df['color'],
         alpha=df['alpha'],
         win=df['WL'],

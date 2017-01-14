@@ -1,12 +1,9 @@
 from constants import teams, var_view_map
 from nba_py.team import TeamGameLogs
 import numpy as np
-from collections import namedtuple
 from datetime import datetime
 from sqlalchemy import *
 
-desc = namedtuple('desc', ['statistic', 'gp', 'mean', 'std', 'u25th',
-                           'median', 'u75th', 'umax', 'date_added'])
 
 all_stats = list(var_view_map.values())
 
@@ -25,7 +22,7 @@ def _alpha(value):
         return .25
 
 
-def insert_leage_average(engine, teams_dict, stat):
+def insert_league_average(engine, teams_dict, stat):
     meta = MetaData()
     with engine.connect() as conn:
         table = Table('description', meta, autoload=True,
@@ -34,7 +31,7 @@ def insert_leage_average(engine, teams_dict, stat):
         gp = np.zeros((30,))
         mean = np.zeros((30,))
         std = np.zeros((30,))
-        min = np.zeros((30,))
+        _min = np.zeros((30,))
         _25th = np.zeros((30,))
         median = np.zeros((30,))
         _75th = np.zeros((30,))
@@ -49,7 +46,7 @@ def insert_leage_average(engine, teams_dict, stat):
             gp[i] = descr[0]
             mean[i] = descr[1]
             std[i] = descr[2]
-            min[i] = descr[3]
+            _min[i] = descr[3]
             _25th[i] = descr[4]
             median[i] = descr[5]
             _75th[i] = descr[6]
@@ -58,7 +55,7 @@ def insert_leage_average(engine, teams_dict, stat):
         stat_desc = dict(statistic=stat, gp=round(np.mean(gp), 2),
                          mean=round(np.mean(mean), 2),
                          std=round(np.mean(std), 2),
-                         min=round(np.mean(min), 2),
+                         min=round(np.mean(_min), 2),
                          u25th=round(np.mean(_25th), 2),
                          median=round(np.mean(median), 2),
                          u75th=round(np.mean(_75th), 2),
@@ -84,7 +81,6 @@ def get_latest(engine, stat):
 
 if __name__ == '__main__':
     engine = create_engine('sqlite:///nba_viz.db')
-    # for i in all_stats:
-    #     tp = insert_leage_average(engine, teams, i)
-    d = get_latest(engine, 'AST')
-    print(d['min'])
+    for i in all_stats:
+        tp = insert_league_average(engine, teams, i)
+    # d = get_latest(engine, 'AST')
